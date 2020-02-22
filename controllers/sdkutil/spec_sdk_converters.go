@@ -106,27 +106,25 @@ func CreateTrainingJobSpecFromDescription(description sagemaker.DescribeTraining
 	return unmarshalled, nil
 }
 
-// Create a CreateTrainingJobInput from a TrainingJobSpec.
-// This panics if json libraries are unable to serialize the spec or deserialize the serialization.
-func CreateCreateTrainingJobInputFromSpec(spec trainingjobv1.TrainingJobSpec) sagemaker.CreateTrainingJobInput {
-	if input, err := createCreateTrainingJobInputFromSpec(spec); err == nil {
-		return input
-	} else {
-		panic("Unable to create CreateTrainingJobInput from spec : " + err.Error())
-	}
-}
-
 // Create a CreateTrainingJob request input from a Kubernetes spec.
 // TODO Implement tests or find an alternative method.
 // This approach was done as part of a proof of concept. It escapes the Go type system via json to convert
 // between trainingjobv1.and sdk struct types. There are a few other ways to do it (see alternatives).
 // This way can be acceptable if we have test coverage that assures breakage when sdk / trainingjobv1.structs diverage.
 // Alternatives: https://quip-amazon.com/3PVUAsbL9I69/how-do-we-convert-between-structs-coming-from-etcd-to-structs-going-to-sagemaker
-func createCreateTrainingJobInputFromSpec(spec trainingjobv1.TrainingJobSpec) (sagemaker.CreateTrainingJobInput, error) {
-
+func CreateCreateTrainingJobInputFromSpec(spec trainingjobv1.TrainingJobSpec) (sagemaker.CreateTrainingJobInput, error) {
 	var output sagemaker.CreateTrainingJobInput
+
+	// Convert each of the KeyValuePairs manually
 	hyperParameters := spec.HyperParameters
 	spec.HyperParameters = []*commonv1.KeyValuePair{}
+
+	debugHookCollectionParameter := nil
+
+	if spec.DebugHookConfig != nil {
+		numConfigurations := len(spec.DebugHookConfig.CollectionConfigurations)
+		debugHookCollectionParameter = [numConfigurations][]*commonv1.KeyValuePair{}
+	}
 
 	marshalledCreateTrainingJobInput, err := json.Marshal(spec)
 	if err != nil {
@@ -200,6 +198,26 @@ func ConvertHyperParameterTrainingJobSummaryFromSageMaker(source *sagemaker.Hype
 
 	target.TunedHyperParameters = tunedHyperParameters
 	return &target, nil
+}
+
+// ConvertDebugRuleEvaluationStatusesFromSageMaker an array of SageMaker DebugRuleEvaluationStatus to a Kubernetes SageMaker type.
+func ConvertDebugRuleEvaluationStatusesFromSageMaker(source []sagemaker.DebugRuleEvaluationStatus) ([]commonv1.DebugRuleEvaluationStatus, error) {
+	var allStatus []commonv1.DebugRuleEvaluationStatus
+
+	for _, status := range source {
+		var target commonv1.DebugRuleEvaluationStatus
+
+		str, err := json.Marshal(status)
+		if err != nil {
+			return nil, err
+		}
+
+		json.Unmarshal(str, &target)
+
+		allStatus = append(allStatus, target)
+	}
+
+	return allStatus, nil
 }
 
 // CreateTrainingJobStatusCountersFromDescription creates a set of TrainingJobStatusCounters from a DescribeHyperParameterTuningJobOutput

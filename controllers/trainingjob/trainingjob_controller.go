@@ -170,6 +170,10 @@ func (r *Reconciler) reconcileTrainingJob(ctx reconcileRequestContext) error {
 		}
 	}
 
+	if err = r.addDebugRuleEvaluationStatusesToStatus(ctx); err != nil {
+		return r.updateStatusAndReturnError(ctx, ReconcilingTrainingJobStatus, "", errors.Wrap(err, "Unable to add debug statuses job to status"))
+	}
+
 	switch ctx.TrainingJobDescription.TrainingJobStatus {
 	case sagemaker.TrainingJobStatusInProgress:
 		if controllers.HasDeletionTimestamp(ctx.TrainingJob.ObjectMeta) {
@@ -255,7 +259,11 @@ func (r *Reconciler) createTrainingJob(ctx reconcileRequestContext) error {
 		ctx.TrainingJob.Spec.TrainingJobName = &ctx.TrainingJobName
 	}
 
+	fmt.Printf("Before: %+v\n", ctx.TrainingJob.Spec)
+
 	createTrainingJobInput = sdkutil.CreateCreateTrainingJobInputFromSpec(ctx.TrainingJob.Spec)
+
+	fmt.Printf("After: %+v\n", createTrainingJobInput)
 
 	ctx.Log.Info("Creating TrainingJob in SageMaker", "input", createTrainingJobInput)
 
@@ -292,6 +300,19 @@ func (r *Reconciler) removeFinalizer(ctx reconcileRequestContext) error {
 		return errors.Wrap(err, "Failed to remove finalizer")
 	}
 	ctx.Log.Info("Finalizer has been removed")
+
+	return nil
+}
+
+// Add information regarding the debugging statuses to the status fields.
+func (r *Reconciler) addDebugRuleEvaluationStatusesToStatus(ctx reconcileRequestContext) error {
+	debugStatuses, err := sdkutil.ConvertDebugRuleEvaluationStatusesFromSageMaker(ctx.TrainingJobDescription.DebugRuleEvaluationStatuses)
+
+	if err != nil {
+		return err
+	}
+
+	ctx.TrainingJob.Status.DebugRuleEvaluationStatuses = debugStatuses
 
 	return nil
 }

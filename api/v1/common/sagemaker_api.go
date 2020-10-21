@@ -442,6 +442,8 @@ type ContainerDefinition struct {
 
 	ModelDataUrl *string `json:"modelDataUrl,omitempty"`
 
+	Mode *string `json:"mode,omitempty"`
+
 	ModelPackageName *string `json:"modelPackageName,omitempty"`
 }
 

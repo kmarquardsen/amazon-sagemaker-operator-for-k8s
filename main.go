@@ -18,7 +18,6 @@ package main
 
 import (
 	"flag"
-	"log"
 	"os"
 	"time"
 
@@ -68,9 +67,9 @@ func main() {
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:             scheme,
 		MetricsBindAddress: metricsAddr,
+		HealthProbeBindAddress: healthProbeAddr,
 		LeaderElection:     enableLeaderElection,
 		Namespace:          namespace,
-		HealthProbeBindAddress: healthProbeBindAddr,
 	})
 
 	if err != nil {
@@ -79,11 +78,11 @@ func main() {
 	}
 
 	if err = mgr.AddReadyzCheck("ping", healthz.Ping); err != nil {
-		log.Panic(err)
+		setupLog.Error(err, "unable to add readiness check")
 	}
 
 	if err = mgr.AddHealthzCheck("ping", healthz.Ping); err != nil {
-		log.Panic(err)
+		setupLog.Error(err, "unable to add health check")
 	}
 
 	ctrl.Log.WithName("Starting manager in the namespace: ").Info(namespace)

@@ -18,6 +18,7 @@ package main
 
 import (
 	"flag"
+	"log"
 	"os"
 	"time"
 
@@ -30,6 +31,7 @@ import (
 	"github.com/aws/amazon-sagemaker-operator-for-k8s/controllers/model"
 	"github.com/aws/amazon-sagemaker-operator-for-k8s/controllers/processingjob"
 	"github.com/aws/amazon-sagemaker-operator-for-k8s/controllers/trainingjob"
+	"sigs.k8s.io/controller-runtime/pkg/healthz"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
@@ -51,9 +53,11 @@ func init() {
 
 func main() {
 	var metricsAddr string
+	var healthProbeAddr string
 	var enableLeaderElection bool
 	var namespace string
 	flag.StringVar(&metricsAddr, "metrics-addr", ":8080", "The address the metric endpoint binds to.")
+	flag.StringVar(&healthProbeAddr, "health-probe-addr", ":8081", "The address the health probe endpoint binds to.")
 	flag.BoolVar(&enableLeaderElection, "enable-leader-election", false,
 		"Enable leader election for controller manager. Enabling this will ensure there is only one active controller manager.")
 	flag.StringVar(&namespace, "namespace", "", "The namespace in which the manager controls and reconciles resources. Leave it blank to watch all namespaces.")
@@ -66,10 +70,20 @@ func main() {
 		MetricsBindAddress: metricsAddr,
 		LeaderElection:     enableLeaderElection,
 		Namespace:          namespace,
+		HealthProbeBindAddress: healthProbeBindAddr,
 	})
+
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
 		os.Exit(1)
+	}
+
+	if err = mgr.AddReadyzCheck("ping", healthz.Ping); err != nil {
+		log.Panic(err)
+	}
+
+	if err = mgr.AddHealthzCheck("ping", healthz.Ping); err != nil {
+		log.Panic(err)
 	}
 
 	ctrl.Log.WithName("Starting manager in the namespace: ").Info(namespace)
